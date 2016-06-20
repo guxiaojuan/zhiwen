@@ -1,0 +1,8 @@
+//commentÊý¾Ý±í
+CREATE TABLE comment(
+  id INT(6) AUTO_INCREMENT PRIMARY KEY,
+  titleID INT(6),
+  comment TEXT,
+  user VARCHAR(20) NOT NULL,
+  date DATETIME
+)

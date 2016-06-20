@@ -30,7 +30,7 @@ $(function(){
 			   }
 		   });
 			
-			//评论的ajax显示
+			//评论显示
 			$.ajax({
 			   url:'show_content.php',
 			   type:'POST',
@@ -38,8 +38,9 @@ $(function(){
 				  var json=$.parseJSON(response);
 				  var html='';
 				  var arr=[];
+				  var summary=[];
 				  $.each(json,function(index,value){
-									   html+=' <h4>' + value.user + '发表于' + value.date + '</h4><h3>' + value.title + '</h3><div class="editor">' + value.content + '</div><div class="bottom">0条评论<span class="down">显示全部</span></div><hr />';
+									   html+=' <h4>' + value.user + '发表于' + value.date + '</h4><h3>' + value.title + '</h3><div class="editor">' + value.content + '</div><div class="bottom"><span class="comment" date-id="' + value.id + '">条评论</span><span class="up">收起</span></div><hr /><div class="comment_list"></div>';
 									   
 				  });
 				  $('.content').append(html);
@@ -65,6 +66,109 @@ $(function(){
 						});
 				  });
 				  */
+				  
+				  //第二种Ajax显示,字符串显示
+				      $.each($('.editor'),function(index,value){
+								arr[index]=$(value).html();
+								//摘要
+								summary[index]=arr[index].substr(0,200);
+								
+								if(summary[index].substring(199,200)=='<')  //去掉html中的特殊字符
+								summary[index]=replacePos(summary[index],200,'');
+								if(summary[index].substring(198,200)=='</'){         
+									summary[index]=replacePos(summary[index],200,'');
+									summary[index]=replacePos(summary[index],199,'');
+								}
+								if(arr[index].length>200){
+									summary[index]+='<span class="down">...显示全部</span>';
+									$(value).html(summary[index]);
+								}
+								$('.bottom .up').hide();
+					   });
+							
+					   //由于显示全部的功能是动态生成的，所以要想多次执行，必须要做成事件委托
+					   $.each($('.editor'),function(index,value){
+						      $(this).on('click','.down',function(){
+								  $('.editor').eq(index).html(arr[index]);    //显示全部评论
+								  $(this).hide();
+								  $('.bottom .up').eq(index).show();
+							  });							 
+				 	   });
+					   $.each($('.bottom'),function(index,value){
+							  $(this).on('click','.up',function(){							                                				 
+								  $('.editor').eq(index).html(summary[index]);    //收起全部评论，显示摘要
+								  $(this).hide();
+								  $('.editor .down').eq(index).show();					   
+							 });
+					   });
+												
+					  $.each($('.bottom'),function(index,value){ //7
+							 $(this).on('click','.comment',function(){ //6
+								 var _this=this;
+								 if($.cookie('user')){ //5
+									  if(!$('.comment_list').eq(index).has('form').length){  //4
+										 $.ajax({
+											 url:'show_comment.php',
+											 type:'POST',
+											 beforSend:function(jqXHR,settings){
+											    $('.comment_list').eq(index).append('<dl class="comment_load"><dd>正在加载评论</dd></dl>'); 
+											 },
+											 success:function(response,status,xhr){  //3
+												  $('.comment_list').eq(index).find('.comment_load').hide();
+												  var json_comment=$.parseJSON(response);
+												  $.each(json_comment,function(index2,value){
+													  $('.comment_list').eq(index).append('<dl class="comment_content"><dt>' + value.user + '</dt><dd>' + value.comment + '</dd><dd class="date">' + value.date + '</dd></dl>');
+												  });
+												
+											      $('.comment_list').eq(index).append('<form><dl class="comment_add"><dt><textarea name="comment"></textarea></dt><dd><input type="hidden" name="titleId" value=" ' + $(_this).attr('data-id') + ' "/><input type="hidden" value=" '+ $.cookie('user') + ' "/><input type="button" value="发表"/></dd></dl></form>');
+									               $('.comment_list').eq(index).find('input[type=button]').button().click(function(){  //2
+															var that=this;	
+															$('.comment_list').eq(index).find('form').ajaxSubmit({
+																	url:'add_comment.php',
+																	type:'POST',
+																	beforeSubmit:function(formData,jqForm,options){
+																		$('#loading').dialog('open');
+																		$(that).button('disable');
+																	},
+																	success:{  //1
+																	   function(responseText,statusText){
+																		  if(responseText){
+																			 $(that).button('enable');
+																			 $('#loading').css('background','url(img/correct.png) no-repeat 20px 8px').html('评论新增成功');
+																			 
+																			 setTimeout(function(){
+																				 var date=new Date();
+																				 $('#loading').dialog('close');
+																				 $('.comment_list').eq(index).prepend('<dl class="comment_content"><dt>' + $.cookie('user') + '</dt><dd>' + $('.comment_list').eq(index).find('textarea').val()+'</dd><dd>' + date.getFullYear() + '-' + (date.getMonth()+1) + '-' + date.getDate() + ' ' + date.getHours() + ':' + date.getMinutes() + ':' + date.getSeconds() + '</dd></dl>'); 
+																				 $('.comment_list').eq(index).find('form').resertForm();
+																				 $('#loading').css('background','url(img/loading.gif) no-repeat 20px 8px').html('正在提交评论');
+																			
+																				 
+																			 },1000);
+																		  }   
+																	   }
+																	},      //1
+															});
+													 });  //2
+												}, //3
+										  });
+									 } //4
+									 
+									 if($('.comment_list').eq(index).is(':hidden'))
+									     $('.comment_list').eq(index).show();
+									 else
+									     $('.comment_list').eq(index).hide();
+										 
+								 }//5 if
+								 else{
+									 $('#error').dialog('open');
+									 setTimer(function(){
+									    $('#error').dialog('close');
+										$('#login').dialog('open');
+									 },1000);
+								 }
+						  }); //6
+					 });//7
 			   },
 				   
 			});
@@ -93,7 +197,7 @@ $(function(){
 												if(responseText){
 													 $('#question').dialog('widget').find('button').eq(1).button('enable');
 													 $('#loading').css('background','url(img/correct.png) no-repeat 20px 8px').html('发布成功');
-													 
+				$('#loading').css('background','url(img/loading.gif) no-repeat 20px 8px').html('评论新增成功');									 
 													 setTimeout(function(){
 														$('#loading').dialog('close');
 														$('#question').dialog('close');
@@ -108,7 +212,7 @@ $(function(){
 						 },
 			 });	
 									   
-		     $('.uEditorCustom').uEditor();
+		   $('.uEditorCustom').uEditor();
 		   
 		   //登录提示
 		   $('#error').dialog({
@@ -119,7 +223,7 @@ $(function(){
 			draggable:false,
 			width:160,
 			height:50,
-		 }).parent().find('.ui-widget-header').hide();
+		   }).parent().find('.ui-widget-header').hide();
 			
 		   //刚开始把用户和退出隐藏
 		   $('#member,#logout').hide();
@@ -462,3 +566,8 @@ $(function(){
 		   $('#tabs').tabs();
 		   $('#accordion').accordion();
 });
+
+//替换特殊字符的函数
+function replacePos(strObj,pos,replaceText){
+	return strObj.substr(0,pos-1)+replaceText+strObj.substring(pos,strObj.length);
+}
